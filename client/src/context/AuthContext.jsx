@@ -11,7 +11,12 @@ export const AuthProvider = ({ children }) => {
         // Check if user is logged in from localStorage
         const userInfo = localStorage.getItem('userInfo');
         if (userInfo) {
-            setUser(JSON.parse(userInfo));
+            try {
+                setUser(JSON.parse(userInfo));
+            } catch (error) {
+                console.error("Invalid user info in localStorage", error);
+                localStorage.removeItem('userInfo');
+            }
         }
         setLoading(false);
     }, []);

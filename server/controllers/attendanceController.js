@@ -1,101 +1,168 @@
+const Attendance = require('../models/Attendance');
 const OTP = require('../models/OTP');
-const Booking = require('../models/Booking');
-const LabSlot = require('../models/LabSlot');
+const User = require('../models/User');
 
-// @desc    Generate OTP for a slot
+// @desc    Generate Attendance OTP (Faculty)
 // @route   POST /api/attendance/generate-otp
-// @access  Private (Faculty)
+// @access  Faculty
 const generateOTP = async (req, res) => {
-    const { slotId } = req.body;
-
-    // Check if slot belongs to faculty
-    const slot = await LabSlot.findById(slotId);
-    if (!slot) return res.status(404).json({ message: 'Slot not found' });
-    if (slot.facultyId.toString() !== req.user._id.toString()) {
-        return res.status(401).json({ message: 'Not authorized' });
-    }
-
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit
-    const expiresAt = new Date(Date.now() + 15 * 1000); // 15 seconds from now
-
     try {
-        // Remove existing OTPs for this slot to avoid confusion? Or just allow new one to coexist?
-        // Usually only one valid OTP at a time is best.
-        await OTP.deleteMany({ slotId });
+        const { period, department } = req.body;
+
+        // Generate a 4-digit code
+        const code = Math.floor(1000 + Math.random() * 9000).toString();
+        const expiresAt = new Date(Date.now() + 20 * 1000); // 20 seconds validity
 
         const otp = await OTP.create({
-            slotId,
-            code: otpCode,
-            expiresAt
+            type: 'attendance',
+            code,
+            expiresAt,
+            metadata: {
+                period,
+                department,
+                facultyId: req.user._id
+            }
         });
 
-        res.json({ code: otp.code, expiresAt: otp.expiresAt });
+        // Create or update today's attendance record for this period
+        // We might just want to return the OTP here and create the record when students join, 
+        // OR create the record now. Let's create a placeholder if it doesn't exist.
+
+        // Actually, we'll just return the OTP. The attendance record is updated/created when students mark it? 
+        // Or cleaner: Create the Attendance document now so we have a persistent record of the session.
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let attendance = await Attendance.findOne({
+            date: today,
+            period,
+            department
+        });
+
+        if (!attendance) {
+            attendance = await Attendance.create({
+                date: today,
+                period,
+                department,
+                otp: code,
+                faculty: req.user._id,
+                studentsPresent: []
+            });
+        } else {
+            // Update the OTP if it was regenerated
+            attendance.otp = code;
+            attendance.faculty = req.user._id;
+            await attendance.save();
+        }
+
+        res.status(200).json({ success: true, code, expiresAt });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
     }
 };
 
-// @desc    Submit OTP for attendance
-// @route   POST /api/attendance/submit-otp
-// @access  Private (Student)
-const submitOTP = async (req, res) => {
-    const { slotId, otp: inputOtp } = req.body;
-    const studentId = req.user._id;
-
+// @desc    Mark Attendance (Student)
+// @route   POST /api/attendance/mark
+// @access  Student
+const markAttendance = async (req, res) => {
     try {
-        // Find OTP for the slot
-        // Must be exact match and not expired
-        // Note: MongoDB TTL background thread runs every 60s, so documents might exist after expiry time.
-        // We must check expiresAt manually for precise 10s logic.
-        const validOTP = await OTP.findOne({ slotId, code: inputOtp });
+        const { code } = req.body;
+        const student = await User.findById(req.user._id);
 
-        if (!validOTP) {
-            return res.status(400).json({ message: 'Invalid OTP' });
+        // Find valid OTP
+        const otpRecord = await OTP.findOne({
+            code,
+            type: 'attendance',
+            expiresAt: { $gt: new Date() }
+        });
+
+        if (!otpRecord) {
+            return res.status(400).json({ message: 'Invalid or Expired OTP' });
         }
 
-        if (new Date() > validOTP.expiresAt) {
-            return res.status(400).json({ message: 'OTP Expired' });
+        // Verify Student Department (Optional: strict check)
+        if (student.department !== otpRecord.metadata.department) {
+            return res.status(400).json({ message: `This OTP is for ${otpRecord.metadata.department} department` });
         }
 
-        // Mark attendance
-        const booking = await Booking.findOne({ slotId, studentId });
-        if (!booking) {
-            return res.status(404).json({ message: 'Booking not found' });
+        const { period, department } = otpRecord.metadata;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Update Attendance Record
+        const attendance = await Attendance.findOne({
+            date: today,
+            period,
+            department
+        });
+
+        if (!attendance) {
+            return res.status(404).json({ message: 'Attendance Session not found' });
         }
 
-        booking.attendanceStatus = 'Present';
-        await booking.save();
+        // Check if already present
+        if (attendance.studentsPresent.includes(req.user._id)) {
+            return res.status(400).json({ message: 'Attendance already marked' });
+        }
 
-        res.json({ message: 'Attendance marked successfully' });
+        attendance.studentsPresent.push(req.user._id);
+        await attendance.save();
+
+        res.status(200).json({ success: true, message: 'Attendance Marked Successfully' });
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
     }
 };
 
-// @desc    Update Marks
-// @route   POST /api/attendance/marks
-// @access  Private (Faculty)
-const updateMarks = async (req, res) => {
-    const { bookingId, marks } = req.body;
-
+// @desc    Get Student Stats
+// @route   GET /api/attendance/stats
+// @access  Student
+const getAttendanceStats = async (req, res) => {
     try {
-        const booking = await Booking.findById(bookingId).populate('slotId');
-        if (!booking) {
-            return res.status(404).json({ message: 'Booking not found' });
-        }
+        // Calculate percentage, etc.
+        // This is a simplified calculation.
+        const totalSessions = await Attendance.countDocuments({ department: req.user.department });
+        const attendedSessions = await Attendance.countDocuments({
+            department: req.user.department,
+            studentsPresent: req.user._id
+        });
 
-        if (booking.slotId.facultyId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ message: 'Not authorized' });
-        }
+        const percentage = totalSessions === 0 ? 0 : ((attendedSessions / totalSessions) * 100).toFixed(2);
 
-        booking.marks = marks;
-        await booking.save();
-
-        res.json({ message: 'Marks updated' });
+        res.status(200).json({
+            totalSessions,
+            attendedSessions,
+            percentage
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
     }
 };
 
-module.exports = { generateOTP, submitOTP, updateMarks };
+// @desc    Get Active OTP (Faculty)
+// @route   GET /api/attendance/active-otp
+// @access  Faculty
+const getActiveOTP = async (req, res) => {
+    try {
+        const otp = await OTP.findOne({
+            'metadata.facultyId': req.user._id,
+            expiresAt: { $gt: new Date() }
+        }).sort({ createdAt: -1 });
+
+        if (!otp) {
+            return res.status(200).json(null);
+        }
+
+        res.status(200).json(otp);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+module.exports = { generateOTP, markAttendance, getAttendanceStats, getActiveOTP };

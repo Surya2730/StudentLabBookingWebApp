@@ -4,7 +4,18 @@ const otpSchema = new mongoose.Schema({
     slotId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'LabSlot',
-        required: true
+        required: false // Made optional for generic use
+    },
+    type: {
+        type: String,
+        enum: ['slot', 'attendance'],
+        default: 'slot'
+    },
+    metadata: {
+        // dynamic data for attendance (e.g., department, period, facultyId)
+        department: String,
+        period: Number,
+        facultyId: String
     },
     code: {
         type: String,

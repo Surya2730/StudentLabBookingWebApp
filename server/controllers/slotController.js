@@ -30,9 +30,9 @@ const createSlot = async (req, res) => {
 // @access  Private
 const getSlots = async (req, res) => {
     try {
-        // Retrieve slots sorted by date
+        // Retrieve slots sorted by creation time (LIFO - Newest First)
         // Filter by user's department
-        const slots = await LabSlot.find({ department: req.user.department }).sort({ date: 1 });
+        const slots = await LabSlot.find({ department: req.user.department }).sort({ createdAt: -1 });
 
         res.json(slots);
     } catch (error) {
@@ -45,7 +45,7 @@ const getSlots = async (req, res) => {
 // @access  Private (Faculty)
 const getMySlots = async (req, res) => {
     try {
-        const slots = await LabSlot.find({ facultyId: req.user._id }).sort({ date: 1 });
+        const slots = await LabSlot.find({ facultyId: req.user._id }).sort({ createdAt: -1 });
         res.json(slots);
     } catch (error) {
         res.status(500).json({ message: error.message });

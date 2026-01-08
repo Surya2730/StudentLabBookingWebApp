@@ -30,7 +30,7 @@ const Login = () => {
             login(data);
             message.success(`Logged in as ${data.name}`);
             if (data.role === 'faculty') {
-                navigate('/faculty-dashboard');
+                navigate('/faculty/home');
             } else {
                 navigate('/student-dashboard');
             }
@@ -52,7 +52,7 @@ const Login = () => {
             login(data);
             message.success(`Logged in as ${data.name}`);
             if (data.role === 'faculty') {
-                navigate('/faculty-dashboard');
+                navigate('/faculty/home');
             } else {
                 navigate('/student-dashboard');
             }

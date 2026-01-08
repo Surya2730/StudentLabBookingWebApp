@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { protect, authorize } = require('../middleware/authMiddleware');
-const { generateOTP, submitOTP, updateMarks } = require('../controllers/attendanceController');
+const { generateOTP, markAttendance, getAttendanceStats, getActiveOTP } = require('../controllers/attendanceController');
+const { protect } = require('../middleware/authMiddleware'); // Assuming this exists
 
-router.post('/generate-otp', protect, authorize('faculty'), generateOTP);
-router.post('/submit-otp', protect, authorize('student'), submitOTP);
-router.post('/marks', protect, authorize('faculty'), updateMarks);
+router.post('/generate-otp', protect, generateOTP);
+router.get('/active-otp', protect, getActiveOTP);
+router.post('/mark', protect, markAttendance);
+router.get('/stats', protect, getAttendanceStats);
 
 module.exports = router;
