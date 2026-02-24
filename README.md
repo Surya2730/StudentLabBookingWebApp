@@ -1,70 +1,96 @@
-# Student Lab Slot Booking & Attendance System
+# LabBooking: Modern Lab Slot & Attendance Management System
 
-A comprehensive MERN stack application for managing university lab slots, enabling students to book sessions and faculty to manage attendance via OTP.
+[![MERN Stack](https://img.shields.io/badge/MERN-Stack-blue.svg)](https://mongodb.com/mern-stack)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## 🚀 Features
+**LabBooking** is a high-performance MERN stack application designed to streamline laboratory scheduling and attendance tracking in academic environments. It eliminates scheduling conflicts and automates attendance through a secure, OTP-based verification system.
 
-### for Students
-- **Department-Specific View**: Automatically filters lab slots based on your department (CSE, ECE, EEE).
-- **Easy Booking**: One-click booking for available slots.
-- **Real-Time Status**: See "Booked" or "Full" status instantly.
-- **Attendance**: Mark attendance using a secure 6-digit OTP provided by faculty.
-- **My Bookings**: View history of all your booked sessions.
+---
 
-### For Faculty
-- **Slot Management**: Create, view, and delete lab slots.
-- **Department Control**: Assign slots to specific departments.
-- **Live Attendance**: Generate a 15-second expiring OTP for secure student attendance.
-- **Student Tracking**: View list of booked students and assign marks.
+## 🏗️ System Architecture
 
-### Authentication
-- **Google Login**: Seamless sign-in with Google.
-- **Dynamic Role Switching**: Smart profile management allows users to switch roles/departments for testing.
-- **Dev Login**: Built-in mock login for development and testing without credentials.
+```mermaid
+graph TD
+    User((User)) -->|React + Ant Design| Frontend[Frontend - Vite]
+    Frontend -->|REST API + JWT| Backend[Backend - Node.js/Express]
+    Backend -->|Mongoose| DB[(MongoDB Atlas)]
+    Backend -->|OAuth 2.0| Google[Google Auth Service]
+```
+
+---
+
+## 🚀 Key Features
+
+### 🎓 For Students
+- **Smart Filtering**: Automatic lab slot filtering based on student department (CSE, ECE, EEE).
+- **One-Click Booking**: Seamless reservation system with real-time capacity tracking.
+- **Secure Attendance**: 4-digit OTP verification system for fraud-proof attendance marking.
+- **Academic Portfolio**: Dedicated dashboard to track bookings, attendance history, and lab marks.
+
+### 🏫 For Faculty & Admin
+- **Dynamic Slot Orchestration**: Full CRUD capabilities for managing lab availability across departments.
+- **Live Attendance Engine**: Generate secure, time-expiring OTPs (15-20s) for classroom sessions.
+- **Performance Analytics**: Track student attendance and assign lab evaluation marks directly through the portal.
+- **Centralized Dashboard**: High-level overview of daily schedules and pending actions.
+
+### 🔐 Security & Auth
+- **Hybrid Authentication**: Support for traditional Email/Password and modern Google OAuth 2.0.
+- **Role-Based Access Control (RBAC)**: Strict permission boundaries for Students, Faculty, and Administrators.
+- **JWT Session Management**: Secure, stateless authentication with cross-origin cookie support.
+
+---
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React.js, Vite, Ant Design
-- **Backend**: Node.js, Express.js
-- **Database**: MongoDB (Mongoose)
-- **Authentication**: JWT, Google OAuth 2.0
-- **Notifications**: Nodemailer (Email)
+- **Frontend**: React 18, Vite, Ant Design (UI Framework), Axios, Framer Motion (Animations).
+- **Backend**: Node.js, Express.js.
+- **Database**: MongoDB with Mongoose ODM.
+- **DevOps**: JWT, Google OAuth API, Dotenv.
 
-## 📦 Installation
+---
 
-1.  **Clone the Repository**
-    ```bash
-    git clone https://github.com/Surya2730/StudentLabBookingWebApp.git
-    cd StudentLabBookingWebApp
-    ```
+## 📦 Installation & Setup
 
-2.  **Install Server Dependencies**
-    ```bash
-    cd server
-    npm install
-    ```
+### Prerequisites
+- Node.js (v16+)
+- MongoDB (Local or Atlas)
+- Google Cloud Console Project (for OAuth)
 
-3.  **Install Client Dependencies**
-    ```bash
-    cd ../client
-    npm install
-    ```
+### 1. Clone & Install
+```bash
+git clone https://github.com/Surya2730/StudentLabBookingWebApp.git
+cd StudentLabBookingWebApp
 
-4.  **Environment Setup**
-    - Create a `.env` file in the `server` directory (use `.env.example` as a template).
-    - Add your MongoDB URI (`mongodb://localhost:27017/student_lab_booking`).
-    - Add Google Client ID (optional for Dev Login).
+# Install Backend Deps
+cd server && npm install
 
-5.  **Run the Application**
-    - **Server**: `cd server && npm start`
-    - **Client**: `cd client && npm run dev`
+# Install Frontend Deps
+cd ../client && npm install
+```
 
-## 🔑 Usage Guide
+### 2. Environment Configuration
+Create a `.env` file in the `server` directory:
+```env
+PORT=5000
+MONGO_URI=your_mongodb_uri
+JWT_SECRET=your_secret_key
+FRONTEND_URL=http://localhost:5173
+GOOGLE_CLIENT_ID=your_google_id
+```
 
-### Simulation Mode (Testing)
-To test both roles simultaneously:
-1.  **Faculty**: Open Chrome -> Login as Faculty -> Create Slot.
-2.  **Student**: Open Incognito Window -> Login as Student (different email) -> Book Slot.
+### 3. Execution
+```bash
+# Start Backend (from /server)
+npm start
 
-### Deployment
-The frontend is built with Vite and can be deployed to Vercel/Netlify. The backend requires a Node.js environment (Render/Heroku/Railway).
+# Start Frontend (from /client)
+npm run dev
+```
+
+---
+
+## 👨‍💻 Author
+**Surya Kumar T** - [GitHub](https://github.com/Surya2730)
+
+---
+*Developed with a focus on UX/UI excellence and scalable architecture.*

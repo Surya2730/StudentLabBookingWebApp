@@ -91,4 +91,30 @@ const getBookingsForSlot = async (req, res) => {
     }
 };
 
-module.exports = { createBooking, getMyBookings, getBookingsForSlot };
+// @desc    Update marks for a booking (Faculty)
+// @route   PUT /api/bookings/:id/marks
+// @access  Private (Faculty)
+const updateBookingMarks = async (req, res) => {
+    try {
+        const { marks } = req.body;
+        const booking = await Booking.findById(req.params.id).populate('slotId');
+
+        if (!booking) {
+            return res.status(404).json({ message: 'Booking not found' });
+        }
+
+        // Authorization check: Ensure faculty owns the slot
+        if (booking.slotId.facultyId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(401).json({ message: 'Not authorized to grade this slot' });
+        }
+
+        booking.marks = marks;
+        await booking.save();
+
+        res.json({ success: true, message: 'Marks updated', booking });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { createBooking, getMyBookings, getBookingsForSlot, updateBookingMarks };

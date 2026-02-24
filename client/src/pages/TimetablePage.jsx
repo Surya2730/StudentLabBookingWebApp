@@ -1,21 +1,20 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Layout, Table, Card } from 'antd';
-import axios from 'axios';
+import { Layout, Table, Card, Typography, Empty, Tag } from 'antd';
+import { CalendarOutlined } from '@ant-design/icons';
+import axios from '../services/api';
 import { AuthContext } from '../context/AuthContext';
 
-const { Content } = Layout;
+const { Title, Text } = Typography;
 
 const TimetablePage = () => {
     const { user } = useContext(AuthContext);
     const [timetable, setTimetable] = useState(null);
 
     useEffect(() => {
-        // Fetch timetable using department from user
         const fetchTimetable = async () => {
             try {
-                // Assuming query params or backend infers from user token
-                const { data } = await axios.get(`http://localhost:5000/api/timetable?department=${user.department}`, {
-                    headers: { Authorization: `Bearer ${user.token}` }
+                const { data } = await axios.get('/timetable', {
+                    params: { department: user.department }
                 });
                 setTimetable(data);
             } catch (error) {
@@ -25,7 +24,6 @@ const TimetablePage = () => {
         if (user) fetchTimetable();
     }, [user]);
 
-    // Data Transformation for Table
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     const tableData = days.map(day => ({
         key: day,
@@ -34,23 +32,59 @@ const TimetablePage = () => {
     }));
 
     const columns = [
-        { title: 'Day', dataIndex: 'day', key: 'day', width: 100 },
-        { title: 'Period 1', render: (_, record) => record.periods[0] || '-' },
-        { title: 'Period 2', render: (_, record) => record.periods[1] || '-' },
-        { title: 'Period 3', render: (_, record) => record.periods[2] || '-' },
-        { title: 'Period 4', render: (_, record) => record.periods[3] || '-' },
-        { title: 'Period 5', render: (_, record) => record.periods[4] || '-' },
-        { title: 'Period 6', render: (_, record) => record.periods[5] || '-' },
-        { title: 'Period 7', render: (_, record) => record.periods[6] || '-' },
+        {
+            title: 'Day',
+            dataIndex: 'day',
+            key: 'day',
+            width: 120,
+            fixed: 'left',
+            render: (t) => <strong style={{ color: 'var(--primary-color)' }}>{t}</strong>
+        },
+        ...Array.from({ length: 7 }, (_, i) => ({
+            title: `Period ${i + 1}`,
+            render: (_, record) => (
+                <div style={{
+                    padding: '8px',
+                    background: record.periods[i] ? '#f0faff' : 'transparent',
+                    borderRadius: '4px',
+                    textAlign: 'center',
+                    minWidth: '100px',
+                    color: record.periods[i] ? '#0050b3' : '#ccc',
+                    fontWeight: record.periods[i] ? 500 : 400
+                }}>
+                    {record.periods[i] || '-'}
+                </div>
+            )
+        }))
     ];
 
     return (
-        <Content style={{ padding: '20px' }}>
-            <h2>My Timetable ({user?.department})</h2>
-            <Card>
-                <Table dataSource={tableData} columns={columns} pagination={false} bordered />
+        <div className="page-container">
+            <div style={{ marginBottom: '32px' }}>
+                <Title level={2}>My Timetable</Title>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <Text type="secondary">Weekly Schedule</Text>
+                    {user && <Tag color="blue">{user.department}</Tag>}
+                </div>
+            </div>
+
+            <Card className="card-modern">
+                {timetable ? (
+                    <Table
+                        dataSource={tableData}
+                        columns={columns}
+                        pagination={false}
+                        bordered
+                        scroll={{ x: true }}
+                    />
+                ) : (
+                    <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description="No timetable available yet."
+                    />
+                )}
             </Card>
-        </Content>
+        </div>
     );
 };
 

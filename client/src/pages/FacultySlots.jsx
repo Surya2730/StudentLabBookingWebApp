@@ -1,17 +1,23 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Card, Button, Table, Modal, Form, Input, DatePicker, TimePicker, InputNumber, message, Tag, Typography, Breadcrumb, Select, Row, Col } from 'antd';
-import { PlusOutlined, ExperimentOutlined, HomeOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import { Navigate } from 'react-router-dom';
+import { Card, Button, Table, Modal, Form, Input, DatePicker, TimePicker, InputNumber, message, Tag, Typography, Breadcrumb, Select, Row, Col, Divider, Empty, Tooltip, Checkbox } from 'antd';
+import { PlusOutlined, ExperimentOutlined, TeamOutlined, QrcodeOutlined, DeleteOutlined, CalendarOutlined, ClockCircleOutlined, SaveOutlined } from '@ant-design/icons';
+import axios from '../services/api';
 import { AuthContext } from '../context/AuthContext';
-import { Link } from 'react-router-dom';
+import moment from 'moment';
 
-// Note: Not importing 'dayjs' here to avoid potential resolution errors if not installed. 
-// Using native Dates or string manipulation if needed, or re-adding if confirmed available.
-// Actually, earlier analysis showed moment usage in package.json. Let's stick to simple logic or assume standard imports.
-// To be safe, I'll avoid external date libs for display if possible, or use standard Intl.DateTimeFormat.
-
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Option } = Select;
+
+const PERIODS = [
+    { id: 1, label: 'Period 1 (08:45-09:35)', start: '08:45', end: '09:35' },
+    { id: 2, label: 'Period 2 (09:35-10:25)', start: '09:35', end: '10:25' },
+    { id: 3, label: 'Period 3 (10:40-11:30)', start: '10:40', end: '11:30' },
+    { id: 4, label: 'Period 4 (11:30-12:20)', start: '11:30', end: '12:20' },
+    { id: 5, label: 'Period 5 (13:30-14:20)', start: '13:30', end: '14:20' },
+    { id: 6, label: 'Period 6 (14:20-15:10)', start: '14:20', end: '15:10' },
+    { id: 7, label: 'Period 7 (15:25-16:30)', start: '15:25', end: '16:30' }
+];
 
 const FacultySlots = () => {
     const { user } = useContext(AuthContext);
@@ -19,46 +25,48 @@ const FacultySlots = () => {
     const [isSlotModalVisible, setIsSlotModalVisible] = useState(false);
     const [bookings, setBookings] = useState([]);
     const [selectedSlot, setSelectedSlot] = useState(null);
-    const [labOtp, setLabOtp] = useState(null);
     const [slotForm] = Form.useForm();
-    const API_URL = 'http://localhost:5000/api';
-
-    // Safe Check
-    if (!user) return <div style={{ padding: 20 }}>Loading...</div>;
+    const [marksLoading, setMarksLoading] = useState({});
+    const [category, setCategory] = useState('upcoming');
 
     useEffect(() => {
         if (user) fetchSlots();
     }, [user]);
 
+    if (!user) return null;
+
+    // Role Guard
+    if (user.role !== 'faculty' && user.role !== 'admin') {
+        return <Navigate to="/student-dashboard" replace />;
+    }
+
     const fetchSlots = async () => {
         try {
-            const { data } = await axios.get(`${API_URL}/slots/my-slots`, {
-                headers: { Authorization: `Bearer ${user.token}` }
-            });
+            const { data } = await axios.get('/slots/my-slots');
             setSlots(data);
         } catch (error) {
-            // silent fail or weak warning
             console.error(error);
         }
     };
 
     const handleCreateSlot = async (values) => {
+        // Logic to support selecting periods (Max 2)
+        // Values.periods is array of IDs e.g. [1] or [1,2]
+        // Currently we map first period start to last period end.
         try {
-            // Handle Date/Time manually to ensure format
-            // AntD DatePicker returns a dayjs/moment object usually
-            const dateStr = values.date ? values.date.format('YYYY-MM-DD') : '';
-            const startStr = values.startTime ? values.startTime.format('HH:mm') : '';
-            const endStr = values.endTime ? values.endTime.format('HH:mm') : '';
+            const periods = values.periods.sort((a, b) => a - b);
+            if (periods.length === 0) return;
+
+            const startP = PERIODS.find(p => p.id === periods[0]);
+            const endP = PERIODS.find(p => p.id === periods[periods.length - 1]);
 
             const payload = {
                 ...values,
-                date: dateStr,
-                startTime: startStr,
-                endTime: endStr,
+                date: values.date.format('YYYY-MM-DD'),
+                startTime: startP.start,
+                endTime: endP.end,
             };
-            await axios.post(`${API_URL}/slots`, payload, {
-                headers: { Authorization: `Bearer ${user.token}` }
-            });
+            await axios.post('/slots', payload);
             message.success('Slot created successfully');
             setIsSlotModalVisible(false);
             slotForm.resetFields();
@@ -70,102 +78,161 @@ const FacultySlots = () => {
 
     const handleViewBookings = async (slot) => {
         setSelectedSlot(slot);
-        setLabOtp(null);
         try {
-            const { data } = await axios.get(`${API_URL}/bookings/slot/${slot._id}`, {
-                headers: { Authorization: `Bearer ${user.token}` }
-            });
+            const { data } = await axios.get(`/bookings/slot/${slot._id}`);
             setBookings(data);
+            setTimeout(() => {
+                document.getElementById('management-section')?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
         } catch (error) {
             console.error('Failed to fetch bookings');
         }
     };
 
-    const generateLabOTP = async () => {
-        if (!selectedSlot) return;
+    const handleUpdateMark = async (bookingId, marks) => {
+        setMarksLoading(prev => ({ ...prev, [bookingId]: true }));
         try {
-            const { data } = await axios.post(`${API_URL}/attendance/generate-otp`, {
-                department: selectedSlot.department,
-                period: 0 // Placeholder for Slot
-            }, {
-                headers: { Authorization: `Bearer ${user.token}` }
-            });
-            setLabOtp(data);
+            await axios.put(`/bookings/${bookingId}/marks`, { marks });
+            message.success('Marks updated');
+            // Refresh bookings to reflect state if needed
         } catch (error) {
-            message.error('Failed to generate OTP');
+            message.error('Failed to save marks');
+        } finally {
+            setMarksLoading(prev => ({ ...prev, [bookingId]: false }));
         }
     };
 
-    const columns = [
-        { title: 'Date', dataIndex: 'date', render: (text) => new Date(text).toDateString() },
-        { title: 'Lab Name', dataIndex: 'labName' },
-        { title: 'Time', render: (_, r) => `${r.startTime} - ${r.endTime}` },
-        { title: 'Dept', dataIndex: 'department', render: (text) => <Tag color="blue">{text}</Tag> },
-        {
-            title: 'Action',
-            render: (text, record) => (
-                <Button onClick={() => handleViewBookings(record)}>Manage</Button>
-            )
-        }
-    ];
+    const renderSlotCard = (slot) => (
+        <Col xs={24} md={12} lg={8} key={slot._id}>
+            <Card
+                className="card-modern"
+                hoverable
+                onClick={() => handleViewBookings(slot)}
+                style={{ cursor: 'pointer', border: selectedSlot?._id === slot._id ? '2px solid var(--primary-color)' : '' }}
+            >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                    <Title level={5} style={{ margin: 0 }}>{slot.labName}</Title>
+                    <Tag color="cyan">{slot.department}</Tag>
+                </div>
+                <Divider style={{ margin: '12px 0' }} />
+                <div style={{ color: 'var(--text-secondary)', fontSize: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span><CalendarOutlined /> {new Date(slot.date).toDateString()}</span>
+                    <span><ClockCircleOutlined /> {slot.startTime} - {slot.endTime}</span>
+                    <span><TeamOutlined /> Bookings: {slot.bookedCount} / {slot.seatCapacity}</span>
+                </div>
+            </Card>
+        </Col>
+    );
 
     return (
-        <div style={{ padding: '24px', background: '#f0f2f5', minHeight: '100%' }}>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <Title level={2} style={{ margin: 0 }}>Lab Slots</Title>
-                <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={() => setIsSlotModalVisible(true)}
-                    size="large"
-                    style={{ background: '#001529', borderColor: '#001529' }}
-                >
-                    Create Slot
-                </Button>
+        <div className="page-container">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                    <Title level={2}>Lab Slots</Title>
+                    <Text type="secondary">Create and manage your lab sessions.</Text>
+                </div>
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
+                    <div style={{ minWidth: '200px' }}>
+                        <Text strong style={{ display: 'block', marginBottom: '8px' }}>Categorize Labs</Text>
+                        <Select value={category} onChange={setCategory} style={{ width: '100%' }} size="large">
+                            <Select.Option value="upcoming">Upcoming Labs</Select.Option>
+                            <Select.Option value="past">Past Labs</Select.Option>
+                            <Select.Option value="all">All Labs</Select.Option>
+                        </Select>
+                    </div>
+                    <Button
+                        type="primary"
+                        size="large"
+                        icon={<PlusOutlined />}
+                        onClick={() => setIsSlotModalVisible(true)}
+                    >
+                        Create Slot
+                    </Button>
+                </div>
             </div>
 
-            <Card style={{ borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-                <Table dataSource={slots} columns={columns} rowKey="_id" />
-            </Card>
+            <Row gutter={[24, 24]}>
+                {(() => {
+                    const filtered = slots.filter(slot => {
+                        const slotDate = new Date(slot.date);
+                        const now = new Date();
+                        // Reset time for date comparison if needed, but for slots usually date is enough
+                        // For a robust check:
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        slotDate.setHours(0, 0, 0, 0);
+
+                        if (category === 'upcoming') return slotDate >= today;
+                        if (category === 'past') return slotDate < today;
+                        return true;
+                    });
+
+                    return filtered.length > 0 ? filtered.map(renderSlotCard) : (
+                        <Col span={24}>
+                            <Empty description={`No ${category} slots found.`} />
+                        </Col>
+                    );
+                })()}
+            </Row>
 
             {selectedSlot && (
-                <Card
-                    style={{ marginTop: 24, borderRadius: '8px', border: '1px solid #1890ff' }}
-                    title={<span style={{ color: '#1890ff' }}><ExperimentOutlined /> Manage: {selectedSlot.labName} ({selectedSlot.department})</span>}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
-                        <Button type="primary" onClick={generateLabOTP}>Generate Slot OTP</Button>
-                        {labOtp && (
-                            <Tag color="green" style={{ marginLeft: 16, fontSize: '18px', padding: '5px 10px' }}>
-                                OTP: {labOtp.code}
-                            </Tag>
-                        )}
-                    </div>
+                <div id="management-section" style={{ marginTop: '40px', animation: 'fadeIn 0.5s' }}>
+                    <Card className="card-modern" title={
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span><ExperimentOutlined /> Managing: {selectedSlot.labName}</span>
+                            <Button size="small" onClick={() => setSelectedSlot(null)}>Close</Button>
+                        </div>
+                    }>
+                        <Row gutter={[24, 24]}>
+                            {/* OTP Generation moved to Home Page as per request */}
 
-                    <Table
-                        style={{ marginTop: 10 }}
-                        dataSource={bookings}
-                        columns={[
-                            { title: 'Student', dataIndex: ['studentId', 'name'] },
-                            { title: 'Email', dataIndex: ['studentId', 'email'] },
-                            {
-                                title: 'Status',
-                                dataIndex: 'attendanceStatus',
-                                render: (status) => (
-                                    <Tag color={status === 'Present' ? 'green' : 'red'}>
-                                        {status}
-                                    </Tag>
-                                )
-                            }
-                        ]}
-                        rowKey="_id"
-                        pagination={false}
-                    />
-                </Card>
+                            <Col span={24}>
+                                <Title level={5} style={{ marginBottom: '16px' }}>Booked Students ({bookings.length})</Title>
+                                <Table
+                                    dataSource={bookings}
+                                    rowKey="_id"
+                                    pagination={{ pageSize: 10 }}
+                                    columns={[
+                                        { title: 'Name', dataIndex: ['studentId', 'name'] },
+                                        { title: 'Email', dataIndex: ['studentId', 'email'] },
+                                        {
+                                            title: 'Status',
+                                            dataIndex: 'attendanceStatus',
+                                            render: (status) => (
+                                                <Tag color={status === 'Present' ? 'green' : 'volcano'}>
+                                                    {status.toUpperCase()}
+                                                </Tag>
+                                            )
+                                        },
+                                        {
+                                            title: 'Marks',
+                                            dataIndex: 'marks',
+                                            render: (marks, record) => (
+                                                <InputNumber
+                                                    defaultValue={marks}
+                                                    min={0}
+                                                    max={100}
+                                                    onBlur={(e) => handleUpdateMark(record._id, e.target.value)}
+                                                    onPressEnter={(e) => handleUpdateMark(record._id, e.target.value)}
+                                                    disabled={marksLoading[record._id]}
+                                                />
+                                            )
+                                        }
+                                    ]}
+                                />
+                            </Col>
+                        </Row>
+                    </Card>
+                </div>
             )}
 
-            <Modal title="Create Lab Slot" open={isSlotModalVisible} onCancel={() => setIsSlotModalVisible(false)} footer={null}>
+            <Modal
+                title="Create New Lab Slot"
+                open={isSlotModalVisible}
+                onCancel={() => setIsSlotModalVisible(false)}
+                footer={null}
+                centered
+            >
                 <Form form={slotForm} layout="vertical" onFinish={handleCreateSlot}>
                     <Form.Item name="labName" label="Lab Name" rules={[{ required: true }]}>
                         <Input placeholder="e.g. Advanced Java Lab" />
@@ -180,22 +247,26 @@ const FacultySlots = () => {
                     <Form.Item name="date" label="Date" rules={[{ required: true }]}>
                         <DatePicker style={{ width: '100%' }} />
                     </Form.Item>
-                    <Row gutter={16}>
-                        <Col span={12}>
-                            <Form.Item name="startTime" label="Start Time" rules={[{ required: true }]}>
-                                <TimePicker format="HH:mm" style={{ width: '100%' }} />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item name="endTime" label="End Time" rules={[{ required: true }]}>
-                                <TimePicker format="HH:mm" style={{ width: '100%' }} />
-                            </Form.Item>
-                        </Col>
-                    </Row>
+
+                    <Form.Item
+                        name="periods"
+                        label="Select Periods (Max 2)"
+                        rules={[
+                            { required: true, message: 'Select at least one period' },
+                            { type: 'array', max: 2, message: 'Maximum 2 periods allowed' }
+                        ]}
+                    >
+                        <Checkbox.Group style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {PERIODS.map(p => (
+                                <Checkbox key={p.id} value={p.id}>{p.label}</Checkbox>
+                            ))}
+                        </Checkbox.Group>
+                    </Form.Item>
+
                     <Form.Item name="seatCapacity" label="Capacity" rules={[{ required: true }]}>
                         <InputNumber min={1} style={{ width: '100%' }} />
                     </Form.Item>
-                    <Button type="primary" htmlType="submit" block style={{ background: '#001529', borderColor: '#001529' }}>Create Slot</Button>
+                    <Button type="primary" htmlType="submit" block size="large">Create Slot</Button>
                 </Form>
             </Modal>
         </div>

@@ -61,9 +61,21 @@ const updatePoints = async (req, res) => {
         const { studentId, rewardPoints, activityPoints, reason, psSubject, psLevel } = req.body;
         // studentId is the User ObjectId
 
-        const profile = await StudentProfile.findOne({ user: studentId });
+        let profile = await StudentProfile.findOne({ user: studentId });
         if (!profile) {
-            return res.status(404).json({ message: 'Student Profile not found' });
+            // Create if not exists
+            const user = await User.findById(studentId);
+            if (!user) return res.status(404).json({ message: 'User not found' });
+
+            // Generate a temporary unique roll number to pass validation
+            const tempRoll = `TEMP_${studentId.toString().slice(-6)}_${Date.now().toString().slice(-4)}`;
+
+            profile = await StudentProfile.create({
+                user: studentId,
+                department: user.department || 'CSE',
+                rollNumber: tempRoll,
+                year: 1
+            });
         }
 
         if (rewardPoints) profile.rewardPoints = (profile.rewardPoints || 0) + parseInt(rewardPoints);
@@ -152,4 +164,34 @@ const searchStudents = async (req, res) => {
     }
 };
 
-module.exports = { getMyProfile, getLeaderboard, updatePoints, searchStudents };
+// @desc    Update My Profile (Student)
+// @route   PUT /api/profile/me
+// @access  Student
+const updateMyProfile = async (req, res) => {
+    try {
+        const { rollNumber, year, cgpa } = req.body;
+        let profile = await StudentProfile.findOne({ user: req.user._id });
+
+        if (!profile) {
+            profile = await StudentProfile.create({
+                user: req.user._id,
+                rollNumber,
+                year: year || 1,
+                cgpa: cgpa || 0,
+                department: req.user.department
+            });
+        } else {
+            if (rollNumber) profile.rollNumber = rollNumber;
+            if (year) profile.year = year;
+            if (cgpa !== undefined) profile.cgpa = cgpa;
+            await profile.save();
+        }
+
+        res.status(200).json(profile);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+module.exports = { getMyProfile, getLeaderboard, updatePoints, searchStudents, updateMyProfile };

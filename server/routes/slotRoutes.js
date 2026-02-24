@@ -5,12 +5,12 @@ const { createSlot, getSlots, getMySlots, getSlotById, deleteSlot } = require('.
 
 router.route('/')
     .get(protect, getSlots)
-    .post(protect, authorize('faculty'), createSlot);
+    .post(protect, authorize('faculty', 'admin'), createSlot);
 
-router.get('/my-slots', protect, authorize('faculty'), getMySlots);
+router.get('/my-slots', protect, authorize('faculty', 'admin'), getMySlots);
 
 router.route('/:id')
     .get(protect, getSlotById)
-    .delete(protect, authorize('faculty'), deleteSlot);
+    .delete(protect, authorize('faculty', 'admin'), deleteSlot);
 
 module.exports = router;

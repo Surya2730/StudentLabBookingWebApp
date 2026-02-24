@@ -7,8 +7,8 @@ import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
-// Replace with your actual Client ID or use a placeholder
-const GOOGLE_CLIENT_ID = "758515650322-rrfmic10srh7bua1a6dp5mqhsm6akkle.apps.googleusercontent.com";
+// Google Client ID from environment variables
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>

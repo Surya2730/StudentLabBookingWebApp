@@ -1,5 +1,5 @@
 import React, { useContext } from 'react';
-import { Layout, Menu } from 'antd';
+import { Layout, Menu, Typography } from 'antd';
 import {
     DashboardOutlined,
     ExperimentOutlined,
@@ -13,6 +13,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
 const { Sider } = Layout;
+const { Title } = Typography;
 
 const Sidebar = ({ collapsed, onCollapse }) => {
     const location = useLocation();
@@ -34,7 +35,7 @@ const Sidebar = ({ collapsed, onCollapse }) => {
         {
             key: '/attendance',
             icon: <ScheduleOutlined />,
-            label: <Link to="/attendance">Attendance %</Link>
+            label: <Link to="/attendance">Attendance</Link>
         },
         {
             key: '/timetable',
@@ -44,7 +45,7 @@ const Sidebar = ({ collapsed, onCollapse }) => {
         {
             key: '/profile',
             icon: <UserOutlined />,
-            label: <Link to="/profile">Profile & Levels</Link>
+            label: <Link to="/profile">Profile</Link>
         }
     ];
 
@@ -52,7 +53,7 @@ const Sidebar = ({ collapsed, onCollapse }) => {
         {
             key: '/faculty/home',
             icon: <HomeOutlined />,
-            label: <Link to="/faculty/home">Faculty Home</Link>
+            label: <Link to="/faculty/home">Home</Link>
         },
         {
             key: '/faculty/slots',
@@ -62,7 +63,7 @@ const Sidebar = ({ collapsed, onCollapse }) => {
         {
             key: '/faculty/points',
             icon: <TrophyOutlined />,
-            label: <Link to="/faculty/points">Manage Points</Link>
+            label: <Link to="/faculty/points">Points</Link>
         },
         {
             key: '/faculty/timetable',
@@ -71,16 +72,41 @@ const Sidebar = ({ collapsed, onCollapse }) => {
         }
     ];
 
-    const items = user.role === 'student' ? studentItems : user.role === 'faculty' ? facultyItems : [];
+    const items = user.role === 'student' ? studentItems : (user.role === 'faculty' || user.role === 'admin') ? facultyItems : [];
 
     return (
-        <Sider collapsible collapsed={collapsed} onCollapse={onCollapse}>
-            <div className="logo" style={{ height: '32px', margin: '16px', background: 'rgba(255, 255, 255, 0.2)' }} />
+        <Sider
+            collapsible
+            collapsed={collapsed}
+            onCollapse={onCollapse}
+            style={{
+                background: '#fff',
+                borderRight: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow-sm)',
+                zIndex: 10
+            }}
+            width={260}
+            theme="light"
+        >
+            <div style={{
+                height: '70px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderBottom: '1px solid var(--border-color)'
+            }}>
+                <Title level={4} style={{ margin: 0, color: 'var(--primary-color)' }}>
+                    {collapsed ? 'LS' : 'LabSlot'}
+                </Title>
+            </div>
+
             <Menu
-                theme="dark"
-                defaultSelectedKeys={[location.pathname]}
                 mode="inline"
+                defaultSelectedKeys={[location.pathname]}
+                selectedKeys={[location.pathname]}
                 items={items}
+                style={{ borderRight: 0, padding: '16px 0' }}
+                className="custom-sidebar-menu"
             />
         </Sider>
     );
